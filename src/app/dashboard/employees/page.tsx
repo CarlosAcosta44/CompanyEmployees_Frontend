@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getEmpleados, deleteEmpleado, Empleado } from "@/services/employees";
 import { useAuth } from "@/contexts/AuthContext";
 import { Users, Pencil, Trash2, Plus, Loader2, RefreshCw, Briefcase, Mail } from "lucide-react";
+import EmployeeModal from "@/components/EmployeeModal";
 
 export default function EmployeesPage() {
   const { user } = useAuth();
@@ -11,11 +12,15 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
+
   const fetchEmpleados = async () => {
     setLoading(true);
     try {
       const data = await getEmpleados();
-      setEmpleados(data.items || data || []);
+      const arrayData = data.datos || data.items || data;
+      setEmpleados(Array.isArray(arrayData) ? arrayData : []);
     } catch (err) {
       console.error(err);
       setError("Error al cargar los empleados.");
@@ -37,12 +42,18 @@ export default function EmployeesPage() {
       alert("Error al eliminar el empleado");
     }
   };
+  
+  const handleOpenModal = (empleado?: Empleado) => {
+    setSelectedEmpleado(empleado || null);
+    setIsModalOpen(true);
+  };
 
   // POLICIES
   // Admin Bogota: No Eliminar, Si Patch
   // Admin Medellin: Si Eliminar, No Patch
   const canDelete = user?.rol === "ADMIN" && user?.ciudad !== "BOGOTA";
   const canEdit = user?.rol === "ADMIN" && user?.ciudad !== "MEDELLIN";
+  const canCreate = user?.rol === "ADMIN" || user?.rol === "USUARIO"; // Based on reqs
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -59,10 +70,16 @@ export default function EmployeesPage() {
           >
             <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm shadow-indigo-600/30">
-            <Plus className="w-5 h-5" />
-            Nuevo Empleado
-          </button>
+          
+          {canCreate && (
+             <button 
+               onClick={() => handleOpenModal()}
+               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm shadow-indigo-600/30"
+             >
+               <Plus className="w-5 h-5" />
+               Nuevo Empleado
+             </button>
+          )}
         </div>
       </div>
 
@@ -114,6 +131,7 @@ export default function EmployeesPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           disabled={!canEdit}
+                          onClick={() => handleOpenModal(empleado)}
                           className={`p-2 rounded-lg transition-colors ${
                             canEdit 
                               ? "text-blue-600 hover:bg-blue-50" 
@@ -151,6 +169,14 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL */}
+      <EmployeeModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchEmpleados}
+        empleado={selectedEmpleado}
+      />
     </div>
   );
 }

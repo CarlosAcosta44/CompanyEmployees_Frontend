@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import api from "@/services/api";
 
 export type Role = "ADMIN" | "USUARIO";
 export type CityPolicy = "MEDELLIN" | "BOGOTA" | "OTRO";
@@ -12,85 +13,61 @@ export interface User {
   rol: Role;
   compania_id: string | null;
   ciudad: CityPolicy; // MOCKED
-  exp: number;
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: (token: string, mockCiudad: CityPolicy) => void;
-  logout: () => void;
+  login: (mockCiudad: CityPolicy) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  token: null,
-  login: () => {},
-  logout: () => {},
+  login: async () => {},
+  logout: async () => {},
   isAuthenticated: false,
   isLoading: true,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  const parseToken = (t: string, city: CityPolicy): User | null => {
+  const fetchUser = async (mockCity: CityPolicy) => {
     try {
-      const base64Url = t.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join("")
-      );
-      const parsed = JSON.parse(jsonPayload);
-      return {
-        ...parsed,
-        ciudad: city, 
-      };
-    } catch (e) {
-      console.error("Failed to parse JWT", e);
-      return null;
+      const res = await api.get("/auth/perfil");
+      const backendUser = res.data;
+      setUser({
+        sub: backendUser.id,
+        username: backendUser.correo,
+        rol: backendUser.rol,
+        compania_id: backendUser.compania_id,
+        ciudad: mockCity,
+      });
+    } catch(e) {
+      setUser(null);
     }
-  };
+  }
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
     const storedCity = localStorage.getItem("mock_ciudad") as CityPolicy;
-    
-    if (storedToken) {
-      const parsedUser = parseToken(storedToken, storedCity || "BOGOTA");
-      if (parsedUser && parsedUser.exp * 1000 > Date.now()) {
-        setToken(storedToken);
-        setUser(parsedUser);
-      } else {
-        // Expired
-        localStorage.removeItem("token");
-        localStorage.removeItem("mock_ciudad");
-      }
-    }
-    setIsLoading(false);
+    fetchUser(storedCity || "BOGOTA").finally(() => setIsLoading(false));
   }, []);
 
-  const login = (newToken: string, mockCity: CityPolicy) => {
-    localStorage.setItem("token", newToken);
+  const login = async (mockCity: CityPolicy) => {
     localStorage.setItem("mock_ciudad", mockCity);
-    const parsedUser = parseToken(newToken, mockCity);
-    setToken(newToken);
-    setUser(parsedUser);
+    await fetchUser(mockCity);
     router.push("/dashboard");
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch(e) {}
     localStorage.removeItem("mock_ciudad");
-    setToken(null);
     setUser(null);
     router.push("/login");
   };
@@ -99,7 +76,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
-        token,
         login,
         logout,
         isAuthenticated: !!user,

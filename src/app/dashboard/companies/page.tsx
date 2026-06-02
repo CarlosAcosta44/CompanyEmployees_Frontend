@@ -4,19 +4,24 @@ import { useEffect, useState } from "react";
 import { getCompanias, deleteCompania, Compania } from "@/services/companies";
 import { useAuth } from "@/contexts/AuthContext";
 import { Building2, Pencil, Trash2, Plus, Loader2, RefreshCw } from "lucide-react";
+import CompanyModal from "@/components/CompanyModal";
 
 export default function CompaniesPage() {
   const { user } = useAuth();
   const [companias, setCompanias] = useState<Compania[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCompania, setSelectedCompania] = useState<Compania | null>(null);
 
   const fetchCompanias = async () => {
     setLoading(true);
     try {
       const data = await getCompanias();
       // Fastapi responds PaginatedResponse
-      setCompanias(data.items || data || []);
+      const arrayData = data.datos || data.items || data;
+      setCompanias(Array.isArray(arrayData) ? arrayData : []);
     } catch (err) {
       console.error(err);
       setError("Error al cargar las compañías.");
@@ -39,11 +44,17 @@ export default function CompaniesPage() {
     }
   };
 
+  const handleOpenModal = (compania?: Compania) => {
+    setSelectedCompania(compania || null);
+    setIsModalOpen(true);
+  };
+
   // POLICIES
   // Admin Bogota: No Eliminar, Si Patch
   // Admin Medellin: Si Eliminar, No Patch
   const canDelete = user?.rol === "ADMIN" && user?.ciudad !== "BOGOTA";
   const canEdit = user?.rol === "ADMIN" && user?.ciudad !== "MEDELLIN";
+  const canCreate = user?.rol === "ADMIN";
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -60,10 +71,16 @@ export default function CompaniesPage() {
           >
             <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm shadow-indigo-600/30">
-            <Plus className="w-5 h-5" />
-            Nueva Compañía
-          </button>
+          
+          {canCreate && (
+            <button 
+              onClick={() => handleOpenModal()} 
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm shadow-indigo-600/30"
+            >
+              <Plus className="w-5 h-5" />
+              Nueva Compañía
+            </button>
+          )}
         </div>
       </div>
 
@@ -106,6 +123,7 @@ export default function CompaniesPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           disabled={!canEdit}
+                          onClick={() => handleOpenModal(compania)}
                           className={`p-2 rounded-lg transition-colors ${
                             canEdit 
                               ? "text-blue-600 hover:bg-blue-50" 
@@ -143,6 +161,14 @@ export default function CompaniesPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL */}
+      <CompanyModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchCompanias}
+        compania={selectedCompania}
+      />
     </div>
   );
 }

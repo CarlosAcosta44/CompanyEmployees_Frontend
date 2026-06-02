@@ -27,9 +27,8 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      const { access_token } = resp.data;
-      if (access_token) {
-        login(access_token, mockCity);
+      if (resp.status === 200) {
+        await login(mockCity);
       }
     } catch (err: any) {
       console.error(err);
