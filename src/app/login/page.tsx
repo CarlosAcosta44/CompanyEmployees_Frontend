@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth, CityPolicy } from "@/contexts/AuthContext";
-import { Building2, Mail, Lock, Loader2, MapPin } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Building2, Mail, Lock, Loader2 } from "lucide-react";
 import api from "@/services/api";
 
 export default function LoginPage() {
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
-  const [mockCity, setMockCity] = useState<CityPolicy>("BOGOTA");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -19,16 +18,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const params = new URLSearchParams();
-      params.append("username", correo);
-      params.append("password", password);
-
-      const resp = await api.post("/auth/login", params, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
+      const resp = await api.post("/auth/login", { userName: correo, password });
 
       if (resp.status === 200) {
-        await login(mockCity);
+        await login();
       }
     } catch (err: any) {
       console.error(err);
@@ -99,27 +92,6 @@ export default function LoginPage() {
                   required
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-indigo-100 ml-1">Simular Ubicación (Políticas)</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <MapPin className="h-5 w-5 text-indigo-300 group-focus-within:text-white transition-colors" />
-                </div>
-                <select
-                  value={mockCity}
-                  onChange={(e) => setMockCity(e.target.value as CityPolicy)}
-                  className="block w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-indigo-300/50 focus:ring-2 focus:ring-indigo-400 focus:border-transparent focus:bg-indigo-900 transition-all outline-none appearance-none"
-                >
-                  <option value="BOGOTA">Administrador Bogotá (No Eliminar, Sí Patch)</option>
-                  <option value="MEDELLIN">Administrador Medellín (Sí Eliminar, No Patch)</option>
-                  <option value="OTRO">Administrador Otra Ciudad (CRUD Completo)</option>
-                </select>
-              </div>
-              <p className="text-xs text-indigo-200 mt-1 ml-1 opacity-75">
-                Para propósitos de demostración.
-              </p>
             </div>
 
             <button

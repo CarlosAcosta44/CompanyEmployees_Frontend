@@ -5,19 +5,21 @@ import { useRouter } from "next/navigation";
 import api from "@/services/api";
 
 export type Role = "ADMIN" | "USUARIO";
-export type CityPolicy = "MEDELLIN" | "BOGOTA" | "OTRO";
+export type CityPolicy = "MEDELLIN" | "BOGOTA" | string;
 
 export interface User {
   sub: string;
   username: string;
   rol: Role;
   compania_id: string | null;
-  ciudad: CityPolicy; // MOCKED
+  ciudad: CityPolicy;
+  first_name?: string;
+  last_name?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (mockCiudad: CityPolicy) => Promise<void>;
+  login: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -36,52 +38,66 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  const fetchUser = async (mockCity: CityPolicy) => {
+  const fetchUser = async () => {
     try {
       const res = await api.get("/auth/perfil");
-      const backendUser = res.data;
+      const d = res.data;
       setUser({
-        sub: backendUser.id,
-        username: backendUser.correo,
-        rol: backendUser.rol,
-        compania_id: backendUser.compania_id,
-        ciudad: mockCity,
+        sub: d.id,
+        username: d.username,
+        rol: d.rol,
+        compania_id: d.compania_id,
+        ciudad: (d.ciudad || "").toUpperCase(),
+        first_name: d.first_name,
+        last_name: d.last_name,
       });
-    } catch(e) {
+      return true;
+    } catch (e: any) {
+      if (e.response?.status === 401) {
+        // Attempt silent refresh
+        try {
+          await api.post("/auth/refresh");
+          // If refresh succeeds, try fetching profile again
+          const retryRes = await api.get("/auth/perfil");
+          const d = retryRes.data;
+          setUser({
+            sub: d.id,
+            username: d.username,
+            rol: d.rol,
+            compania_id: d.compania_id,
+            ciudad: (d.ciudad || "").toUpperCase(),
+            first_name: d.first_name,
+            last_name: d.last_name,
+          });
+          return true;
+        } catch {
+          // If refresh fails, user is completely logged out
+        }
+      }
       setUser(null);
+      return false;
     }
-  }
+  };
 
   useEffect(() => {
-    const storedCity = localStorage.getItem("mock_ciudad") as CityPolicy;
-    fetchUser(storedCity || "BOGOTA").finally(() => setIsLoading(false));
+    fetchUser().finally(() => setIsLoading(false));
   }, []);
 
-  const login = async (mockCity: CityPolicy) => {
-    localStorage.setItem("mock_ciudad", mockCity);
-    await fetchUser(mockCity);
+  const login = async () => {
+    await fetchUser();
     router.push("/dashboard");
   };
 
   const logout = async () => {
     try {
       await api.post("/auth/logout");
-    } catch(e) {}
-    localStorage.removeItem("mock_ciudad");
+    } catch {}
     setUser(null);
     router.push("/login");
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        logout,
-        isAuthenticated: !!user,
-        isLoading,
-      }}
-    >
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
