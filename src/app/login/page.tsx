@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Building2, Mail, Lock, Loader2 } from "lucide-react";
+import Link from "next/link";
 import api from "@/services/api";
 
 export default function LoginPage() {
@@ -108,6 +109,18 @@ export default function LoginPage() {
                 "Ingresar al sistema"
               )}
             </button>
+
+            <div className="text-center mt-6">
+              <p className="text-indigo-200 text-sm">
+                ¿No tienes una cuenta?{" "}
+                <Link
+                  href="/register"
+                  className="text-white font-semibold hover:text-indigo-300 transition-colors underline underline-offset-4"
+                >
+                  Regístrate aquí
+                </Link>
+              </p>
+            </div>
           </form>
         </div>
       </div>
